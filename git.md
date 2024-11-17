@@ -13,8 +13,11 @@
 提交文件： 提交文件并添加提交信息： git commit -m "首次提交"
 
 关联远程仓库： 将本地仓库与GitHub上的远程仓库关联： git remote add origin https://github.com/你的用户名/你的仓库名.git
-
-推送代码到GitHub： 将本地代码推送到远程仓库： git push -u origin master
+git add .
+git commit -m "Initial commit"
+初始化
+git branch xxx
+推送代码到GitHub： 将本地代码推送到远程仓库： git push -u origin xxx
 
 注意事项
 
