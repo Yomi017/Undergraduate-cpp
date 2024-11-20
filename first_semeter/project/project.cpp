@@ -35,7 +35,9 @@ enum class Token {
     NUMBER,         // 数字（整数或浮点数）
     STRING,          // 字符串常量
     GT,
-    LT
+    LT,
+    AND,
+    OR
 };
 
 // 列的定义
@@ -139,7 +141,10 @@ unordered_map<string, Token> token_map = {
     {"ON", Token::ON},
     {"FROM", Token::FROM},
     {"WHERE", Token::WHERE},
-    {"VALUES", Token::VALUES}  // 新增 VALUES 关键字
+    {"VALUES", Token::VALUES},
+    {"AND", Token::AND},
+    {"OR", Token::OR}
+
 };
 
 string token_to_string(Token token) {
@@ -172,6 +177,8 @@ string token_to_string(Token token) {
         case Token::IDENTIFIER: return "Token::IDENTIFIER";
         case Token::NUMBER: return "Token::NUMBER";
         case Token::STRING: return "Token::STRING";
+        case Token::AND: return "Token::AND";
+        case Token::OR: return "Token::OR";
         default: return "Unknown Token";
     }
 }
@@ -187,7 +194,7 @@ bool is_string_literal(const string& s) {
 }
 
 // 词法分析函数
-vector<TokenWithValue> lex(const string& input,bool& inside_paren) {
+vector<TokenWithValue> lex(const string& input) {
     vector<TokenWithValue> result;
     const char* ip = input.c_str();  // ip 是指向字符串的字符指针
     string token;
@@ -223,17 +230,17 @@ vector<TokenWithValue> lex(const string& input,bool& inside_paren) {
         }
         // 处理括号符号
         else if (*ip == '(') {
-            if (!inside_paren) {
-                inside_paren = true;  // 标记进入括号
+            // if (!inside_paren) {
+                // inside_paren = true;  // 标记进入括号
                 result.push_back(TokenWithValue(Token::LPAREN, "("));
-            }
+            // }
             ++ip;
         }
         else if (*ip == ')') {
-            if (inside_paren) {
+            // if (inside_paren) {
                 result.push_back(TokenWithValue(Token::RPAREN, ")"));
-                inside_paren = false;  // 标记离开括号
-            }
+                // inside_paren = false;  // 标记离开括号
+            // }
             ++ip;
         }
         // 处理逗号
@@ -297,23 +304,28 @@ vector<vector<TokenWithValue>> lexfile(const string& filename) {
         cerr << "ERROR! Cannot open file " << filename << endl;
         return {};
     }
-    bool inside_paren = false;  // 标记是否在括号内
+
     vector<vector<TokenWithValue>> all_tokens;  // 二维容器，存储每一行的解析结果
+    vector<TokenWithValue> current_line_tokens;  // 当前行的 token 容器
     string line;
 
     // 逐行读取文件
     while (getline(file, line)) {
-        // 调用 Lex 函数解析每一行
-        vector<TokenWithValue> tokens = lex(line,inside_paren);
-        if ((inside_paren && line.find('(') == string::npos) || (!inside_paren && line.find(')') != string::npos && line.find('(') == string::npos)) {
-            all_tokens.back().insert(all_tokens.back().end(), tokens.begin(), tokens.end());
-        } else {
-            all_tokens.push_back(tokens);
+        vector<TokenWithValue> tokens = lex(line);  // 调用 lex 函数解析每一行
+        for (const auto& token : tokens) {
+            current_line_tokens.push_back(token);  // 将当前 token 加入行容器
+            if (token.token == Token::SEMICOLON) {  // 检测到分号
+                all_tokens.push_back(current_line_tokens);  // 保存当前行
+                current_line_tokens.clear();  // 开始新的行
+            }
         }
     }
-    if (!all_tokens.empty() && !all_tokens.back().empty() && all_tokens.back().back().token != Token::SEMICOLON) {
-        all_tokens.back().push_back(TokenWithValue(Token::SEMICOLON, ";"));
+
+    // 如果最后还有未保存的 token，将其加入到 all_tokens 中
+    if (!current_line_tokens.empty()) {
+        all_tokens.push_back(current_line_tokens);
     }
+
     file.close();
     return all_tokens;
 }
@@ -431,16 +443,14 @@ bool is_number_where(const std::string& s) {
     }
 }
 
-
-
-void where_select(vector<string>& column_Name, vector<TokenWithValue>::const_iterator& it, vector<TokenWithValue>::const_iterator end, Table& table) {
-    for (const auto& column : column_Name) {
-        cout << column;
-            if (column != column_Name.back()) {
-                        cout << ",";
-            }
-        }
-        cout << endl;
+void where_select(vector<string>& column_Name, vector<TokenWithValue>::const_iterator& it, vector<TokenWithValue>::const_iterator end, Table& table, Table& table1) {
+    // for (const auto& column : column_Name) {
+    //     cout << column;
+    //         if (column != column_Name.back()) {
+    //                     cout << ",";
+    //         }
+    //     }
+    //     cout << endl;
         ++it;
     if (it != end && it->token == Token::IDENTIFIER) {
         string column_name = it->value;
@@ -496,33 +506,42 @@ void where_select(vector<string>& column_Name, vector<TokenWithValue>::const_ite
                 for (size_t i = 0; i < table.data.size(); ++i) {
                     if (match[i] == true) {
                         const auto& row = table.data[i];
+                        vector<string> new_row;
                         for (const auto& column : column_Name) {
                             auto it = find_if(table.columns.begin(), table.columns.end(), [&](const Column& col) {
                                 return col.name == column;
                             });
                             if (it != table.columns.end()) {
                                 size_t index = distance(table.columns.begin(), it);
-                                cout << row[index];
-                                if (column != column_Name.back()) {
-                                    cout << ",";
-                                }
+                                new_row.push_back(row[index]);
                             }
                         }
-                        cout << endl;
+                        table1.data.push_back(new_row);
                     }
                 }
-                }
+
+                // 输出table1
+                // for (const auto& row : table1.data) {
+                //     for (const auto& value : row) {
+                //         cout << value;
+                //         if (&value != &row.back()) {
+                //             cout << ",";
+                //         }
+                //     }
+                //     cout << endl;
+                // }
             }
         }
-        column_Name.clear();
+
     }
+}
 
 // 选择特定一列或几列
 void identifier_select(const string& column_name, vector<TokenWithValue>::const_iterator& it, vector<TokenWithValue>::const_iterator end) {
     if (it != end && it->token == Token::COMMA) {
         ++it;
         select_data(it, end);
-    } else if (it != end && it->token == Token::FROM && column_Name.size() > 1) {
+    } else if (it != end && it->token == Token::FROM && column_Name.size() >= 1) {
         ++it;
         if (it != end && it->token == Token::IDENTIFIER) {
             string table_name = it->value;
@@ -537,7 +556,97 @@ void identifier_select(const string& column_name, vector<TokenWithValue>::const_
             ++it;
             if (it != end && it->token == Token::WHERE) {
                 Table& table = current_database->tables[table_name];
-                where_select(column_Name,it, end, table);
+                Table table1;
+                where_select(column_Name,it, end, table, table1);
+                ++it;
+                // for (const auto& column : column_Name) {
+                //     cout << column;
+                //     if (column != column_Name.back()) {
+                //         cout << ",";
+                //     }
+                // }
+                // // 输出table1
+                // for (const auto& row : table1.data) {
+                //     for (const auto& value : row) {
+                //         cout << value;
+                //         if (&value != &row.back()) {
+                //             cout << ",";
+                //         }
+                //     }
+                //     cout << endl;
+                // }
+                if (it != end && it->token == Token::AND) {
+                    Table table2;
+                    where_select(column_Name,it, end, table, table2);
+                    for (const auto& column : column_Name) {
+                        cout << column;
+                        if (column != column_Name.back()) {
+                            cout << ",";
+                        }
+                    }
+                    cout << endl;
+                    for (const auto& row1 : table1.data) {
+                        for (const auto& row2 : table2.data) {
+                            if (row1 == row2) {
+                                for (const auto& value : row1) {
+                                    cout << value;
+                                    if (&value != &row1.back()) {
+                                        cout << ",";
+                                    }
+                                }
+                                cout << endl;
+                            }
+                        }
+                    }
+                } else if (it != end && it->token == Token::OR) {
+                    Table table2;
+                    where_select(column_Name,it, end, table, table2);
+                    for (const auto& column : column_Name) {
+                        cout << column;
+                        if (column != column_Name.back()) {
+                            cout << ",";
+                        }
+                    }
+                    cout << endl;
+                    for (const auto& row : table1.data) {
+                        for (const auto& value : row) {
+                            cout << value;
+                            if (&value != &row.back()) {
+                                cout << ",";
+                            }
+                        }
+                        cout << endl;
+                    }
+                    for (const auto& row : table2.data) {
+                        if (find(table1.data.begin(), table1.data.end(), row) == table1.data.end()) {
+                            for (const auto& value : row) {
+                                cout << value;
+                                if (&value != &row.back()) {
+                                    cout << ",";
+                                }
+                            }
+                            cout << endl;
+                        }
+                    }
+                } else {
+                    for (const auto& column : column_Name) {
+                        cout << column;
+                        if (column != column_Name.back()) {
+                            cout << ",";
+                        }
+                    }
+                    cout << endl;
+                    for (const auto& row : table1.data) {
+                        for (const auto& value : row) {
+                            cout << value;
+                            if (&value != &row.back()) {
+                                cout << ",";
+                            }
+                        }
+                        cout << endl;
+                    }
+                }
+            column_Name.clear();
             }else {
             Table& table = current_database->tables[table_name];
             for (const auto &column : column_Name) {
@@ -578,6 +687,49 @@ void select_data(vector<TokenWithValue>::const_iterator& it, vector<TokenWithVal
         column_Name.push_back(column_name);
         identifier_select(column_name, it, end);
     }
+}
+
+// 删除数据
+void asterisk_delete(vector<TokenWithValue>::const_iterator& it, vector<TokenWithValue>::const_iterator end){
+        string table_name = it->value;
+        if (current_database == nullptr) {
+            cerr << "ERROR! No database selected.\n";
+            return;
+        }
+        if (current_database->tables.find(table_name) == current_database->tables.end()) {
+            cerr << "ERROR! Table " << table_name << " does not exist.\n";
+            return;
+        }
+        Table& table = current_database->tables[table_name];
+        table.data.clear();
+        // cout << "All data from table " << table_name << " deleted.\n";
+}
+
+void identifier_delete(const string& column_name, vector<TokenWithValue>::const_iterator& it, vector<TokenWithValue>::const_iterator end){
+    ++it;
+    if (it != end && it->token == Token::IDENTIFIER){
+        } else {
+        cerr << "ERROR! Expected column name after WHERE.\n";
+        return;
+    }
+}
+
+void delete_data(vector<TokenWithValue>::const_iterator& it, vector<TokenWithValue>::const_iterator end){
+    if (it != end && it->token == Token::DELETE){
+        ++it;
+        if (it != end && it->token == Token::FROM) {
+            ++it;
+            if (it != end && it->token == Token::IDENTIFIER) {
+                 string column_name = it->value;
+                ++it;
+                column_Name.push_back(column_name);
+                identifier_delete(column_name, it, end);
+        } else {
+            cerr << "ERROR! Expected FROM after DELETE.\n";
+            return;
+        }
+    }
+}
 }
 
 // 执行 SQL 命令
@@ -674,6 +826,14 @@ void execute_query(const vector<TokenWithValue>& tokens) {
     else if (it != tokens.end() && it->token == Token::SELECT) { 
         ++it;
         select_data(it, tokens.end());
+    } else if (it != tokens.end() && it->token == Token::UPDATE) {
+        ++it;
+        update_data(it, tokens.end());
+    } else if (it != tokens.end() && it->token == Token::DELETE) {
+        ++it;
+        delete_data(it, tokens.end());
+    } else {
+        cerr << "ERROR! Unknown command.\n";
     }
 }
 
@@ -684,11 +844,11 @@ int main() {
     //         cout << token_to_string(token.token) << " ";
     //     }
     //     cout << endl;
-    // }
+    // }  // 输出词法分析结果
 
     for (const auto& line_tokens : lex_output) {
         execute_query(line_tokens);
-    }
+    } // 执行 SQL 命令
     // for (const auto& table : current_database->tables) {
     //     cout << "Table " << table.first << ":\n";
     //     for (const auto& column : table.second.columns) {
@@ -716,7 +876,7 @@ int main() {
     //             cout << endl;
     //         }
     //     }
-    // }
+    // }  // 输出数据库和表的信息
     
     return 0;
 }
