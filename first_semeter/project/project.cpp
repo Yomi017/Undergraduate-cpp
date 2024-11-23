@@ -14,6 +14,21 @@
 using namespace std;
 
 int colnum = 0;
+int select_num = 0;
+ofstream out;
+
+void initialize_output_file(string filename) {
+    out.open(filename, ios::out | ios::trunc); // 以截断模式打开，清空文件
+    if (!out.is_open()) {
+        cerr << "ERROR! Unable to open output.csv for writing." << endl;
+    }
+}
+
+void close_output_file() {
+    if (out.is_open()) {
+        out.close();
+    }
+}
 
 enum class Token {
     EQUAL,          // =
@@ -360,7 +375,7 @@ vector<vector<TokenWithValue>> lexfile(const string& filename) {
 // 数据库
 void create_database(const string& db_name) {
     if (databases.find(db_name) != databases.end()) {
-        cerr << "Database " << db_name << " already exists.\n";
+        cerr << "Database " << db_name << " already exists." << "At column " << colnum << endl;
         return;
     }
     // cout << "Database " << db_name << " created.\n";
@@ -371,7 +386,7 @@ void create_database(const string& db_name) {
 // 进入数据库
 void use_database(const string& db_name) {
     if (databases.find(db_name) == databases.end()) {
-        cerr << "ERROR! Database " << db_name << " does not exist.\n";
+        cerr << "ERROR! Database " << db_name << " does not exist." << "At column " << colnum << endl;
         return;
     }
     current_database = &databases[db_name];
@@ -381,7 +396,7 @@ void use_database(const string& db_name) {
 // 创建表
 void create_table(const string& table_name, vector<TokenWithValue>::const_iterator& it, vector<TokenWithValue>::const_iterator end) {
     if (current_database == nullptr) {
-        cerr << "ERROR! No database selected.\n";
+        cerr << "ERROR! No database selected." << "At column " << colnum << endl;
         return;
     }
 
@@ -389,7 +404,7 @@ void create_table(const string& table_name, vector<TokenWithValue>::const_iterat
     Table table(table_name);
     
     if (it == end || it->token != Token::LPAREN) {
-        cerr << "ERROR! Expected '(' after table name.\n";
+        cerr << "ERROR! Expected '(' after table name." << "At column " << colnum << endl;
         return;
     }
     ++it; 
@@ -400,7 +415,7 @@ void create_table(const string& table_name, vector<TokenWithValue>::const_iterat
             string column_name = it->value;
             ++it; 
             if (it == end || it->token != Token::IDENTIFIER) {
-                cerr << "ERROR! Expected column type after column name.\n";
+                cerr << "ERROR! Expected column type after column name." << "At column " << colnum << endl;
                 return;
             }
             string column_type = it->value;
@@ -413,7 +428,7 @@ void create_table(const string& table_name, vector<TokenWithValue>::const_iterat
     }
 
     if (it == end || it->token != Token::RPAREN) {
-        cerr << "ERROR! Expected ')' after column definitions.\n";
+        cerr << "ERROR! Expected ')' after column definitions. " << "At column " << colnum << endl;
         return;
     }
 
@@ -430,31 +445,37 @@ void asterisk_select(vector<TokenWithValue>::const_iterator& it, vector<TokenWit
         if (it != end && it->token == Token::IDENTIFIER) {
             string table_name = it->value;
             if (current_database == nullptr) {
-                cerr << "ERROR! No database selected.\n";
+                cerr << "ERROR! No database selected." << "At column " << colnum << endl;
                 return;
             }
             if (current_database->tables.find(table_name) == current_database->tables.end()) {
-                cerr << "ERROR! Table " << table_name << " does not exist.\n";
+                cerr << "ERROR! Table " << table_name << " does not exist." << "At column " << colnum << endl;
                 return;
             }
             Table& table = current_database->tables[table_name];
             for (const auto& column : table.columns) {
-                cout << column.name;
+                out << column.name;
                 if (&column != &table.columns.back()) {
-                    cout << ",";
+                    out << ",";
                 }
             }
-            cout << endl;
+            out << endl;
             for (const auto& row : table.data) {
                 for (const auto& value : row) {
-                    cout << value;
+                    out << value;
                     if (&value != &row.back()) {
-                        cout << ",";
+                        out << ",";
                     }
                 }
-                cout << endl;
+                out << endl;
             }
+        } else {
+            cerr << "ERROR! Expected table name after FROM." << "At column " << colnum << endl;
+            return;
         }
+    } else {
+        cerr << "ERROR! Expected FROM after *." << "At column " << colnum << endl;
+        return;
     }
 }
 
@@ -470,13 +491,6 @@ bool is_number_where(const std::string& s) {
 }
 
 void where_select(vector<string>& column_Name, vector<TokenWithValue>::const_iterator& it, vector<TokenWithValue>::const_iterator end, Table& table, Table& table1) {
-    // for (const auto& column : column_Name) {
-    //     cout << column;
-    //         if (column != column_Name.back()) {
-    //                     cout << ",";
-    //         }
-    //     }
-    //     cout << endl;
         ++it;
     if (it != end && it->token == Token::IDENTIFIER) {
         string column_name = it->value;
@@ -544,21 +558,18 @@ void where_select(vector<string>& column_Name, vector<TokenWithValue>::const_ite
                         }
                         table1.data.push_back(new_row);
                     }
-                }
-
-                // 输出table1
-                // for (const auto& row : table1.data) {
-                //     for (const auto& value : row) {
-                //         cout << value;
-                //         if (&value != &row.back()) {
-                //             cout << ",";
-                //         }
-                //     }
-                //     cout << endl;
-                // }
+                } 
+            } else {
+                cerr << "ERROR! Expected value after operator." << "At column " << colnum << endl;
+                return;
             }
+        } else {
+            cerr << "ERROR! Expected operator after column name." << "At column " << colnum << endl;
+            return;
         }
-
+    } else {
+        cerr << "ERROR! Expected column name after WHERE." << "At column " << colnum << endl;
+        return;
     }
 }
 
@@ -598,23 +609,23 @@ void inner_helper(Table& table1, Table& table2, const string& column1_name1, con
             vector<string> new_row = {table1_map[key], row[col2_index1]};  // 匹配后输出 column1_name1 和 column2_name1 的值
             result.push_back(new_row);
         } else {
-            cout << "No match found for " << key << endl;
+            cerr << "No match found for " << key << endl;
         }
     }
 
     if (result.empty()) {
-        cout << "No result found." << endl;
+        cerr << "No result found." << endl;
         return;
     }
 
     // 输出结果
-    cout << column1_name1 << ", " << column2_name1 << endl;
+    out << column1_name1 << ", " << column2_name1 << endl;
     for (const auto& row : result) {
         for (size_t i = 0; i < row.size(); ++i) {
-            cout << row[i];
-            if (i < row.size() - 1) cout << ", ";
+            out << row[i];
+            if (i < row.size() - 1) out << ", ";
         }
-        cout << endl;
+        out << endl;
     }
 }
 
@@ -636,37 +647,37 @@ void innerjoin(vector<TokenWithValue>::const_iterator& it, vector<TokenWithValue
                                 string column2_name2 = it->value;
                                 inner_helper(table1, table2, column1_name1, column1_name2, column2_name1, column2_name2);
                             } else {
-                                cerr << "ERROR! Expected column name after POINT.\n";
+                                cerr << "ERROR! Expected column name after POINT. " << "At column " << colnum << endl;
                                 return;
                             }
                         } else {
-                            cerr << "ERROR! Expected POINT after table name.\n";
+                            cerr << "ERROR! Expected POINT after table name. " << "At column " << colnum << endl;
                             return;
                         }
                     } else if (it != end && it->token == Token::IDENTIFIER && it->value != table_name2) {
-                        cerr << "ERROR! The table name does not equal to the second table name.\n";
+                        cerr << "ERROR! The table name does not equal to the second table name. " << "At column " << colnum << endl;
                         return;
                     } else {
-                        cerr << "ERROR! Expected table name after EQUAL.\n";
+                        cerr << "ERROR! Expected table name after EQUAL. " << "At column " << colnum << endl;
                         return;
                     }
                 } else {
-                    cerr << "ERROR! Expected EQUAL after column name.\n";
+                    cerr << "ERROR! Expected EQUAL after column name." << "At column " << colnum << endl;
                     return;
                 }
             } else {
-                cerr << "ERROR! Expected column name after POINT.\n";
+                cerr << "ERROR! Expected column name after POINT." << "At column " << colnum << endl;
                 return;
             }
         } else {
-            cerr << "ERROR! Expected POINT after table name.\n";
+            cerr << "ERROR! Expected POINT after table name." << "At column " << colnum << endl;
             return;
         }
     } else if (it != end && it->token == Token::IDENTIFIER && it->value != table_name1) {
-        cerr << "ERROR! The table name does not equal to the first table name.\n";
+        cerr << "ERROR! The table name does not equal to the first table name." << "At column " << colnum << endl;
         return;
     } else {
-        cerr << "ERROR! Expected table name after ON.\n";
+        cerr << "ERROR! Expected table name after ON." << "At column " << colnum << endl;
         return;}
 }
 
@@ -706,52 +717,52 @@ void INNERJOIN(vector<TokenWithValue>::const_iterator& it, vector<TokenWithValue
                                                         ++it;
                                                         innerjoin(it, end, table_name1, column1_name1, table_name2, column2_name1, table1, table2);
                                                     } else {
-                                                        cerr << "ERROR! Expected ON after JOIN.\n";
+                                                        cerr << "ERROR! Expected ON after JOIN. " << "At column " << colnum << endl;
                                                         return;
                                                     }
                                                 }
                                             } else {
-                                                cerr << "ERROR! Expected JOIN after INNER.\n";
+                                                cerr << "ERROR! Expected JOIN after INNER. " << "At column " << colnum << endl;
                                                 return;
                                             }
                                         } else {
-                                            cerr << "ERROR! Expected INNER after FROM.\n";
+                                            cerr << "ERROR! Expected INNER after FROM. " << "At column " << colnum << endl;
                                             return;
                                         }
                                     } else {
-                                        cerr << "ERROR! Expected table name after FROM.\n";
+                                        cerr << "ERROR! Expected table name after FROM. " << "At column " << colnum << endl;
                                         return;
                                     }
                                 } else {
-                                    cerr << "ERROR! Expected FROM after column name.\n";
+                                    cerr << "ERROR! Expected FROM after column name. " << "At column " << colnum << endl;
                                     return;
                                 }
                             } else {
-                                cerr << "ERROR! Expected column name after POINT.\n";
+                                cerr << "ERROR! Expected column name after POINT. " << "At column " << colnum << endl;
                                 return;
                             }
                         } else {
-                            cerr << "ERROR! Expected POINT after table name.\n";
+                            cerr << "ERROR! Expected POINT after table name. " << "At column " << colnum << endl;
                             return;
                         }
                     } else {
-                        cerr << "ERROR! Expected table name after COMMA.\n";
+                        cerr << "ERROR! Expected table name after COMMA. " << "At column " << colnum << endl;
                         return;
                     }
                 } else {
-                    cerr << "ERROR! Expected COMMA after column name.\n";
+                    cerr << "ERROR! Expected COMMA after column name. " << "At column " << colnum << endl;
                     return;
                 }
             } else {
-                cerr << "ERROR! Expected column name after POINT.\n";
+                cerr << "ERROR! Expected column name after POINT. " << "At column " << colnum << endl;
                 return;
             }
         } else {
-            cerr << "ERROR! Expected POINT after table name.\n";
+            cerr << "ERROR! Expected POINT after table name. " << "At column " << colnum << endl;
             return;
         }
     } else {
-        cerr << "ERROR! Expected table name after POINT.\n";
+        cerr << "ERROR! Expected table name after POINT. " << "At column " << colnum << endl;
         return;}
 }
 
@@ -767,11 +778,11 @@ void identifier_select(const string& column_name, vector<TokenWithValue>::const_
         if (it != end && it->token == Token::IDENTIFIER) {
             string table_name = it->value;
             if (current_database == nullptr) {
-                cerr << "ERROR! No database selected.\n";
+                cerr << "ERROR! No database selected." << "At column " << colnum << endl;
                 return;
             }
             if (current_database->tables.find(table_name) == current_database->tables.end()) {
-                cerr << "ERROR! Table " << table_name << " does not exist.\n";
+                cerr << "ERROR! Table " << table_name << " does not exist." << "At column " << colnum << endl;
                 return;
             }
             ++it;
@@ -780,102 +791,115 @@ void identifier_select(const string& column_name, vector<TokenWithValue>::const_
                 Table table1;
                 where_select(column_Name,it, end, table, table1);
                 ++it;
-                // for (const auto& column : column_Name) {
-                //     cout << column;
-                //     if (column != column_Name.back()) {
-                //         cout << ",";
-                //     }
-                // }
-                // // 输出table1
-                // for (const auto& row : table1.data) {
-                //     for (const auto& value : row) {
-                //         cout << value;
-                //         if (&value != &row.back()) {
-                //             cout << ",";
-                //         }
-                //     }
-                //     cout << endl;
-                // }
                 if (it != end && it->token == Token::AND) {
                     Table table2;
                     where_select(column_Name,it, end, table, table2);
-                    for (const auto& column : column_Name) {
-                        cout << column;
+                    for (const auto &column : column_Name) {
+                        auto it = find_if(table.columns.begin(), table.columns.end(), [&](const Column& col) {
+                            return col.name == column;
+                        });
+                        if (it == table.columns.end()) {
+                            cerr << "ERROR! Column " << column << " does not exist in table " << table_name << "." << "At column " << colnum << endl;
+                            return;
+                        }
+                        out << column;
                         if (column != column_Name.back()) {
-                            cout << ",";
+                            out << ",";
                         }
                     }
-                    cout << endl;
+                    out << endl;
                     for (const auto& row1 : table1.data) {
                         for (const auto& row2 : table2.data) {
                             if (row1 == row2) {
                                 for (const auto& value : row1) {
-                                    cout << value;
+                                    out << value;
                                     if (&value != &row1.back()) {
-                                        cout << ",";
+                                        out << ",";
                                     }
                                 }
-                                cout << endl;
+                                out << endl;
                             }
                         }
                     }
                 } else if (it != end && it->token == Token::OR) {
                     Table table2;
                     where_select(column_Name,it, end, table, table2);
-                    for (const auto& column : column_Name) {
-                        cout << column;
+                    for (const auto &column : column_Name) {
+                        auto it = find_if(table.columns.begin(), table.columns.end(), [&](const Column& col) {
+                            return col.name == column;
+                        });
+                        if (it == table.columns.end()) {
+                            cerr << "ERROR! Column " << column << " does not exist in table " << table_name << "." << "At column " << colnum << endl;
+                            return;
+                        }
+                        out << column;
                         if (column != column_Name.back()) {
-                            cout << ",";
+                            out << ",";
                         }
                     }
-                    cout << endl;
+                    out << endl;
                     for (const auto& row : table1.data) {
                         for (const auto& value : row) {
-                            cout << value;
+                            out << value;
                             if (&value != &row.back()) {
-                                cout << ",";
+                                out << ",";
                             }
                         }
-                        cout << endl;
+                        out << endl;
                     }
                     for (const auto& row : table2.data) {
                         if (find(table1.data.begin(), table1.data.end(), row) == table1.data.end()) {
                             for (const auto& value : row) {
-                                cout << value;
+                                out << value;
                                 if (&value != &row.back()) {
-                                    cout << ",";
+                                    out << ",";
                                 }
                             }
-                            cout << endl;
+                            out << endl;
                         }
                     }
                 } else {
-                    for (const auto& column : column_Name) {
-                        cout << column;
+                    for (const auto &column : column_Name) {
+                        auto it = find_if(table.columns.begin(), table.columns.end(), [&](const Column& col) {
+                            return col.name == column;
+                        });
+                        if (it == table.columns.end()) {
+                            cerr << "ERROR! Column " << column << " does not exist in table " << table_name << "." << "At column " << colnum << endl;
+                            return;
+                        }
+                        out << column;
                         if (column != column_Name.back()) {
-                            cout << ",";
+                            out << ",";
                         }
                     }
-                    cout << endl;
+                    out << endl;
                     for (const auto& row : table1.data) {
                         for (const auto& value : row) {
-                            cout << value;
+                            out << value;
                             if (&value != &row.back()) {
-                                cout << ",";
+                                out << ",";
                             }
                         }
-                        cout << endl;
+                        out << endl;
                     }
                 }
             column_Name.clear();
             } else {
             Table& table = current_database->tables[table_name];
             for (const auto &column : column_Name) {
-                cout << column;
+                auto it = find_if(table.columns.begin(), table.columns.end(), [&](const Column& col) {
+                    return col.name == column;
+                });
+                if (it == table.columns.end()) {
+                    cerr << "ERROR! Column " << column << " does not exist in table " << table_name << "." << "At column " << colnum << endl;
+                    return;
+                }
+                out << column;
                 if (column != column_Name.back()) {
-                    cout << ",";}
+                    out << ",";
+                }
             }
-            cout << endl;
+            out << endl;
             for (const auto& row : table.data) {
                 for (const auto& column : column_Name) {
                     auto it = find_if(table.columns.begin(), table.columns.end(), [&](const Column& col) {
@@ -883,18 +907,20 @@ void identifier_select(const string& column_name, vector<TokenWithValue>::const_
                     });
                     if (it != table.columns.end()) {
                         size_t index = distance(table.columns.begin(), it);
-                        cout << row[index];
+                        out << row[index];
                         if (column != column_Name.back()) {
-                            cout << ",";}
+                            out << ",";}
                     }
                 }
-                cout << endl;
+                out << endl;
             }
-
+            column_Name.clear();
         }
-        }
+        } else {
+            cerr << "ERROR! Expected WHERE or ; after column name." << "At column " << colnum << endl;
+            return;
+        } 
     }
-
 }
 
 void select_data(vector<TokenWithValue>::const_iterator& it, vector<TokenWithValue>::const_iterator end) {
@@ -913,11 +939,11 @@ void select_data(vector<TokenWithValue>::const_iterator& it, vector<TokenWithVal
 void asterisk_delete(vector<TokenWithValue>::const_iterator& it, vector<TokenWithValue>::const_iterator end){
         string table_name = it->value;
         if (current_database == nullptr) {
-            cerr << "ERROR! No database selected.\n";
+            cerr << "ERROR! No database selected." << "At column " << colnum << endl;
             return;
         }
         if (current_database->tables.find(table_name) == current_database->tables.end()) {
-            cerr << "ERROR! Table " << table_name << " does not exist.\n";
+            cerr << "ERROR! Table " << table_name << " does not exist." << "At column " << colnum << endl;
             return;
         }
         Table& table = current_database->tables[table_name];
@@ -982,9 +1008,17 @@ void where_delete(vector<TokenWithValue>::const_iterator& it, vector<TokenWithVa
                         table.data.erase(table.data.begin() + i);
                     }
                 }
+            } else {
+                cerr << "ERROR! Expected value after operator." << "At column " << colnum << endl;
+                return;
             }
+        } else {
+            cerr << "ERROR! Expected operator after column name." << "At column " << colnum << endl;
+            return;
         }
-
+    } else {
+        cerr << "ERROR! Expected column name after WHERE." << "At column " << colnum << endl;
+        return;
     }
 }
 
@@ -999,7 +1033,7 @@ void identifier_delete(const string& table_name, vector<TokenWithValue>::const_i
             --it;
             asterisk_delete(it, end);
         } else {
-            cerr << "ERROR! Expected WHERE or ; after column name.\n";
+            cerr << "ERROR! Expected WHERE or ; after column name." << "At column " << colnum << endl;
             return;
         }
 }
@@ -1011,7 +1045,7 @@ void delete_data(vector<TokenWithValue>::const_iterator& it, vector<TokenWithVal
                  string table_name = it->value;
                 identifier_delete(table_name, it, end);
         } else {
-            cerr << "ERROR! Expected FROM after DELETE.\n";
+            cerr << "ERROR! Expected FROM after DELETE." << "At column " << colnum << endl;
             return;
         }
     }
@@ -1201,7 +1235,7 @@ void update_helper(Table& table, const string& column_name, const string& expres
             }
         }
     } else {
-        cerr << "ERROR! Expected digit or identifier after EQUAL.\n";
+        cerr << "ERROR! Expected digit or identifier after EQUAL." << "At column " << colnum << endl;
     }
 }
 
@@ -1260,31 +1294,30 @@ void update_data(vector<TokenWithValue>::const_iterator& it, vector<TokenWithVal
                                 update_helper(table, column_name_list[i], expression_list[i], condition_column, symbol, condition_value, digit_or_identifier_list[i]);
                             }
                         } else {
-                            cerr << "ERROR! Expected value after symbol.\n";
+                            cerr << "ERROR! Expected value after symbol." << "At column " << colnum << endl;
                             return;
                         }
                     } else {
-                        cerr << "ERROR! Expected symbol after column name.\n";
+                        cerr << "ERROR! Expected symbol after column name." << "At column " << colnum << endl;
                         return;
                     }
                 } else {
-                    cerr << "ERROR! Expected column name after WHERE.\n";
+                    cerr << "ERROR! Expected column name after WHERE." << "At column " << colnum << endl;
                     return;
                 }
             } else {
-                cerr << "ERROR! Expected WHERE after expressions.\n";
+                cerr << "ERROR! Expected WHERE after expressions." << "At column " << colnum << endl;
                 return;
             }
         } else {
-            cerr << "ERROR! Expected SET after table name.\n";
+            cerr << "ERROR! Expected SET after table name." << "At column " << colnum << endl;
             return;
         }
     } else {
-        cerr << "ERROR! Expected table name after UPDATE.\n";
+        cerr << "ERROR! Expected table name after UPDATE." << "At column " << colnum << endl;
         return;
     }
 }
-
 
 // 执行 SQL 命令
 void execute_query(const vector<TokenWithValue>& tokens) {
@@ -1319,11 +1352,11 @@ void execute_query(const vector<TokenWithValue>& tokens) {
             if (it != tokens.end() && it->token == Token::IDENTIFIER) {
                 string table_name = it->value;
                 if (current_database == nullptr) {
-                    cerr << "ERROR! No database selected.\n";
+                    cerr << "ERROR! No database selected." << "At column " << colnum << endl;
                     return;
                 }
                 if (current_database->tables.find(table_name) == current_database->tables.end()) {
-                    cerr << "ERROR! Table " << table_name << " does not exist.\n";
+                    cerr << "ERROR! Table " << table_name << " does not exist." << "At column " << colnum << endl;
                     return;
                 }
                 current_database->tables.erase(table_name);
@@ -1337,11 +1370,11 @@ void execute_query(const vector<TokenWithValue>& tokens) {
             if (it != tokens.end() && it->token == Token::IDENTIFIER) {
                 string table_name = it->value;
                 if (current_database == nullptr) {
-                    cerr << "ERROR! No database selected.\n";
+                    cerr << "ERROR! No database selected." << "At column " << colnum << endl;
                     return;
                 }
                 if (current_database->tables.find(table_name) == current_database->tables.end()) {
-                    cerr << "ERROR! Table " << table_name << " does not exist.\n";
+                    cerr << "ERROR! Table " << table_name << " does not exist." << "At column " << colnum << endl;
                     return;
                 }
                 Table& table = current_database->tables[table_name];
@@ -1362,7 +1395,7 @@ void execute_query(const vector<TokenWithValue>& tokens) {
                         }
                         if (it != tokens.end() && it->token == Token::RPAREN) {
                             if (values.size() != table.columns.size()) {
-                                cerr << "ERROR! Number of values does not match number of columns.\n";
+                                cerr << "ERROR! Number of values does not match number of columns." << "At column " << colnum << endl;
                                 return;
                             }
                             table.data.push_back(values);
@@ -1387,22 +1420,17 @@ void execute_query(const vector<TokenWithValue>& tokens) {
         ++it;
         delete_data(it, tokens.end());
     } else {
-        cerr << "ERROR! Unknown command.\n";
+        cerr << "ERROR! Unknown command." << "At column " << colnum << endl;
     }
 }
 
 int main() {
-    string input;
-    // cin >> input >> output;
+    string input, output;
     input = "input.sql";
-    // output = "output.txt";
+    output = "output.csv";
     vector<vector<TokenWithValue>> lex_output = lexfile(input);
-    // ofstream outfile(output);
-    // if (!outfile.is_open()) {
-    //     cerr << "ERROR! Cannot open file " << output << endl;
-    //     return 1;
-    // }
-
+    initialize_output_file(output);
+    
     // for (const auto& line_tokens : lex_output) {
     //     for (const auto& token : line_tokens) {
     //         cout << token_to_string(token.token) << " ";
@@ -1415,20 +1443,6 @@ int main() {
         execute_query(line_tokens);
     } // 执行 SQL 命令
 
-    // for (const auto& db : databases) {
-    //     cout << "Database " << db.first << ":\n";
-    //     for (const auto& table : db.second.tables) {
-    //         cout << "Table " << table.first << ":\n";
-    //         for (const auto& column : table.second.columns) {
-    //             cout << column.name << "," ;
-    //         }
-    //         for (const auto& row : table.second.data) {
-    //             for (const auto& value : row) {
-    //                 cout << value << ",";
-    //             }
-    //             cout << endl;
-    //         }
-    //     }
-    // }  // 输出数据库和表的信息
+    close_output_file();
     return 0;
 }
