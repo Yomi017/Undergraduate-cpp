@@ -1449,18 +1449,23 @@ void execute_query(const vector<TokenWithValue>& tokens) {
 }
 
 int main() {
-    string input, output;
-    input = "input.sql";
-    output = "output.csv";
-    vector<vector<TokenWithValue>> lex_output = lexfile(input);
-    initialize_output_file(output);
-
-    // for (const auto& line_tokens : lex_output) {
+    // 读取 store.sql 文件，恢复数据库状态
+    vector<vector<TokenWithValue>> lex_store = lexfile("store.sql");
+    // for (const auto& line_tokens : lex_store) {
     //     for (const auto& token : line_tokens) {
     //         cout << token_to_string(token.token) << " ";
     //     }
     //     cout << endl;
     // }  // 输出词法分析结果
+    for (const auto& line_tokens : lex_store) {
+        execute_query(line_tokens);
+    }
+
+    string input, output;
+    input = "input.sql";
+    output = "output.csv";
+    vector<vector<TokenWithValue>> lex_output = lexfile(input);
+    initialize_output_file(output);
 
     for (const auto& line_tokens : lex_output) {
         ++colnum;
@@ -1468,6 +1473,47 @@ int main() {
     } // 执行 SQL 命令
 
     close_output_file();
-    
+
+    // 将数据库状态写入 store.txt
+    ofstream store;
+    // 截断文件，以便写入新的数据库状态
+    store.open("store.sql", ios::trunc);
+    if (store.is_open()) {
+        for (const auto& db_pair : databases) {
+            const Database& db = db_pair.second;
+            store << "CREATE" << " " << "DATABASE " << db.name << ";" << endl;
+            store << "USE" << " " << "DATABASE " << db.name << ";" << endl;
+            for (const auto& table_pair : db.tables) {
+                const Table& table = table_pair.second;
+                store << "CREATE" << " " << "TABLE " << table.name << " (" << endl;
+                for (const auto& column : table.columns) {
+                    store << "  ";
+                    store << column.name << " " << column.type;
+                    if (&column != &table.columns.back()) {
+                        store << ",";
+                    }
+                    store << endl;
+                }
+                store << ")" << ";" << endl;
+                for (const auto& row : table.data) {
+                    store << "INSERT" << " " << "INTO " << table.name << " VALUES (";
+                    for (const auto& value : row) {
+                        if (is_number_where(value)) {
+                            store << value;
+                        } else {
+                            store << "'" << value << "'";
+                        }
+                        if (&value != &row.back()) {
+                            store << ",";
+                        }
+                    }
+                    store << ")" << ";" << endl;
+                }
+            }
+        }
+        store.close();
+    } else {
+        cerr << "ERROR! Unable to open store.sql for writing." << endl;
+    }
     return 0;
 }
