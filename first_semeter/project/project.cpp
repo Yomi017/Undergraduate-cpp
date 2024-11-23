@@ -453,6 +453,10 @@ void asterisk_select(vector<TokenWithValue>::const_iterator& it, vector<TokenWit
                 return;
             }
             Table& table = current_database->tables[table_name];
+            if (select_num !=0 ){
+                out << "---" << endl;
+            }
+            ++select_num;
             for (const auto& column : table.columns) {
                 out << column.name;
                 if (&column != &table.columns.back()) {
@@ -618,6 +622,10 @@ void inner_helper(Table& table1, Table& table2, const string& column1_name1, con
         return;
     }
 
+    if (select_num !=0 ){
+        out << "---" << endl;
+    }
+    ++select_num;
     // 输出结果
     out << column1_name1 << ", " << column2_name1 << endl;
     for (const auto& row : result) {
@@ -802,6 +810,10 @@ void identifier_select(const string& column_name, vector<TokenWithValue>::const_
                             cerr << "ERROR! Column " << column << " does not exist in table " << table_name << "." << "At column " << colnum << endl;
                             return;
                         }
+                        if (select_num !=0 ){
+                            out << "---" << endl;
+                        }
+                        ++select_num;
                         out << column;
                         if (column != column_Name.back()) {
                             out << ",";
@@ -832,6 +844,10 @@ void identifier_select(const string& column_name, vector<TokenWithValue>::const_
                             cerr << "ERROR! Column " << column << " does not exist in table " << table_name << "." << "At column " << colnum << endl;
                             return;
                         }
+                        if (select_num !=0 ){
+                        out << "---" << endl;
+                        }
+                        ++select_num;
                         out << column;
                         if (column != column_Name.back()) {
                             out << ",";
@@ -867,6 +883,10 @@ void identifier_select(const string& column_name, vector<TokenWithValue>::const_
                             cerr << "ERROR! Column " << column << " does not exist in table " << table_name << "." << "At column " << colnum << endl;
                             return;
                         }
+                        if (select_num !=0 ){
+                            out << "---" << endl;
+                        }
+                        ++select_num;
                         out << column;
                         if (column != column_Name.back()) {
                             out << ",";
@@ -894,6 +914,10 @@ void identifier_select(const string& column_name, vector<TokenWithValue>::const_
                     cerr << "ERROR! Column " << column << " does not exist in table " << table_name << "." << "At column " << colnum << endl;
                     return;
                 }
+                if (select_num !=0 ){
+                    out << "---" << endl;
+                }
+                ++select_num;
                 out << column;
                 if (column != column_Name.back()) {
                     out << ",";
@@ -1430,7 +1454,7 @@ int main() {
     output = "output.csv";
     vector<vector<TokenWithValue>> lex_output = lexfile(input);
     initialize_output_file(output);
-    
+
     // for (const auto& line_tokens : lex_output) {
     //     for (const auto& token : line_tokens) {
     //         cout << token_to_string(token.token) << " ";
@@ -1444,5 +1468,6 @@ int main() {
     } // 执行 SQL 命令
 
     close_output_file();
+    
     return 0;
 }
