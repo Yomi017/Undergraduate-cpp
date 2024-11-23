@@ -129,8 +129,6 @@ class Database {
         unordered_map<string, Table> tables;
 };
 
-extern unordered_map<string, Token> token_map;
-extern string token_to_string(Token token);
 
 struct TokenWithValue {
     Token token;
@@ -338,7 +336,6 @@ vector<TokenWithValue> lex(const string& input) {
 
     return result;
 }
-
 
 vector<vector<TokenWithValue>> lexfile(const string& filename) {
     ifstream file(filename);
