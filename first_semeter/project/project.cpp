@@ -129,7 +129,6 @@ class Database {
         unordered_map<string, Table> tables;
 };
 
-
 struct TokenWithValue {
     Token token;
     string value;
@@ -1448,12 +1447,7 @@ void execute_query(const vector<TokenWithValue>& tokens) {
 int main() {
     // 读取 store.sql 文件，恢复数据库状态
     vector<vector<TokenWithValue>> lex_store = lexfile("store.sql");
-    // for (const auto& line_tokens : lex_store) {
-    //     for (const auto& token : line_tokens) {
-    //         cout << token_to_string(token.token) << " ";
-    //     }
-    //     cout << endl;
-    // }  // 输出词法分析结果
+
     for (const auto& line_tokens : lex_store) {
         execute_query(line_tokens);
     }
@@ -1463,7 +1457,12 @@ int main() {
     output = "output.csv";
     vector<vector<TokenWithValue>> lex_output = lexfile(input);
     initialize_output_file(output);
-
+    for (const auto& line_tokens : lex_output) {
+        for (const auto& token : line_tokens) {
+            cout << token_to_string(token.token) << " ";
+        }
+        cout << endl;
+    }  // 输出词法分析结果
     for (const auto& line_tokens : lex_output) {
         ++colnum;
         execute_query(line_tokens);
