@@ -1512,4 +1512,4 @@ int main() {
         cerr << "ERROR! Unable to open store.sql for writing." << endl;
     }
     return 0;
-}
+} 
