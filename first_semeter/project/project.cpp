@@ -36,9 +36,9 @@ enum class Token {
     LPAREN,         // (
     RPAREN,         // )
     SEMICOLON,      // ;
-    CREATE,
-    USE,
-    INSERT,
+    CREATE,         // CREATE
+    USE,            // USE
+    INSERT,         // INSERT
     DROP,
     SELECT,
     INNER,
@@ -57,15 +57,16 @@ enum class Token {
     IDENTIFIER,     // 标识符
     COMMA,          // ,
     NUMBER,         // 数字（整数或浮点数）
-    STRING,          // 字符串常量
-    GT,
-    LT,
-    AND,
-    OR,
-    PLUS, // 加法
-    MINUS, // 减法 
-    DIVIDE, // 除法
-    MULTIPLY, // 乘法
+    STRING,         // 字符串常量
+    GT,             // >
+    LT,             // <
+    AND,            // AND
+    OR,             // OR
+    PLUS,           // +
+    MINUS,          // -
+    DIVIDE,         // ÷
+    MULTIPLY,       // ×
+    NOT,            // !
 };
 
 // 列的定义
@@ -178,9 +179,11 @@ unordered_map<string, Token> token_map = {
     {"+", Token::PLUS},
     {"-", Token::MINUS},
     {"/", Token::DIVIDE},
-    {"*", Token::MULTIPLY}
+    {"*", Token::MULTIPLY},
+    {"!", Token::NOT},
 };
 
+// 打印token的字符串形式（用于调试）
 string token_to_string(Token token) {
     switch (token) {
         case Token::EQUAL: return "Token::EQUAL";
@@ -218,6 +221,7 @@ string token_to_string(Token token) {
         case Token::MINUS: return "Token::MINUS";
         case Token::DIVIDE: return "Token::DIVIDE";
         case Token::MULTIPLY: return "Token::MULTIPLY";
+        case Token::NOT: return "Token::NOT";
         default: return "Unknown Token";
     }
 }
@@ -496,8 +500,18 @@ void where_select(vector<string>& column_Name, vector<TokenWithValue>::const_ite
         string column_name = it->value;
         ++it;
         // 检查操作符
-        if (it != end && (it->token == Token::EQUAL || it->token == Token::GT || it->token == Token::LT)) {
-            string op = it->value;
+        if (it != end && (it->token == Token::EQUAL || it->token == Token::GT || it->token == Token::LT || it->token == Token::NOT)) {
+            string tp = it->value;
+            if (it != end && it->token == Token::NOT) {
+                ++it;
+                if (it != end && it->token == Token::EQUAL) {
+                    tp = "!=";
+                } else {
+                    cerr << "ERROR! Expected = after !." << "At column " << colnum << endl;
+                    return;
+                }
+            }
+            string op = tp;
             ++it;
             if (it != end && (it->token == Token::STRING || it->token == Token::NUMBER)) {
                 string value = it->value;
@@ -536,6 +550,14 @@ void where_select(vector<string>& column_Name, vector<TokenWithValue>::const_ite
                             if (is_number_where(value)) {
                                 if (is_number_where(target_row[index])) {
                                     if (target_row[index] < value) {
+                                        match[distance(table.data.begin(), find(table.data.begin(), table.data.end(), target_row))] = true;
+                                    }
+                                }
+                            }
+                        } else if (op == "!=") {
+                            if (is_number_where(value)) {
+                                if (is_number_where(target_row[index])) {
+                                    if (target_row[index] != value) {
                                         match[distance(table.data.begin(), find(table.data.begin(), table.data.end(), target_row))] = true;
                                     }
                                 }
@@ -977,8 +999,18 @@ void where_delete(vector<TokenWithValue>::const_iterator& it, vector<TokenWithVa
         string column_name = it->value;
         ++it;
         // 检查操作符
-        if (it != end && (it->token == Token::EQUAL || it->token == Token::GT || it->token == Token::LT)) {
-            string op = it->value;
+        if (it != end && (it->token == Token::EQUAL || it->token == Token::GT || it->token == Token::LT || it->token == Token::NOT)) {
+            string tp = it->value;
+            if (it != end && it->token == Token::NOT) {
+                ++it;
+                if (it != end && it->token == Token::EQUAL) {
+                    tp = "!=";
+                } else {
+                    cerr << "ERROR! Expected = after !." << "At column " << colnum << endl;
+                    return;
+                }
+            }
+            string op = tp;
             ++it;
             if (it != end && (it->token == Token::STRING || it->token == Token::NUMBER)) {
                 string value = it->value;
@@ -1016,6 +1048,14 @@ void where_delete(vector<TokenWithValue>::const_iterator& it, vector<TokenWithVa
                             if (is_number_where(value)) {
                                 if (is_number_where(target_row[index])) {
                                     if (target_row[index] < value) {
+                                        match[distance(table.data.begin(), find(table.data.begin(), table.data.end(), target_row))] = true;
+                                    }
+                                }
+                            }
+                        } else if (op == "!=") {
+                            if (is_number_where(value)) {
+                                if (is_number_where(target_row[index])) {
+                                    if (target_row[index] != value) {
                                         match[distance(table.data.begin(), find(table.data.begin(), table.data.end(), target_row))] = true;
                                     }
                                 }
@@ -1457,12 +1497,12 @@ int main() {
     output = "output.csv";
     vector<vector<TokenWithValue>> lex_output = lexfile(input);
     initialize_output_file(output);
-    for (const auto& line_tokens : lex_output) {
-        for (const auto& token : line_tokens) {
-            cout << token_to_string(token.token) << " ";
-        }
-        cout << endl;
-    }  // 输出词法分析结果
+    // for (const auto& line_tokens : lex_output) {
+    //     for (const auto& token : line_tokens) {
+    //         cout << token_to_string(token.token) << " ";
+    //     }
+    //     cout << endl;
+    // }  // 输出词法分析结果
     for (const auto& line_tokens : lex_output) {
         ++colnum;
         execute_query(line_tokens);

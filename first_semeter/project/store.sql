@@ -5,21 +5,7 @@ CREATE TABLE student (
   Name TEXT,
   GPA FLOAT
 );
-INSERT INTO student VALUES (2,'Ali',1);
-INSERT INTO student VALUES (3,'Sara',3.8);
-INSERT INTO student VALUES (4,'Nora',3.2);
-CREATE TABLE course (
-  CourseID INTEGER,
-  CourseName TEXT,
-  Credits INTEGER
-);
-INSERT INTO course VALUES (101,'Mathematics',3);
-INSERT INTO course VALUES (102,'Physics',4);
-INSERT INTO course VALUES (103,'Chemistry',3);
-CREATE TABLE enrollment (
-  StudentID INTEGER,
-  CourseID INTEGER,
-  Semester TEXT
-);
-INSERT INTO enrollment VALUES (2,410,'Spring 2024');
-INSERT INTO enrollment VALUES (3,1662,'Spring 2023');
+INSERT INTO student VALUES (1,'John',3.5);
+INSERT INTO student VALUES (2,'Jane',4.0);
+INSERT INTO student VALUES (3,'Jim',4.0);
+INSERT INTO student VALUES (4,'Jill',4.0);
