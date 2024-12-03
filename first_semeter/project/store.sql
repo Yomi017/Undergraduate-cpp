@@ -1,11 +1,31 @@
-CREATE DATABASE db_university;
-USE DATABASE db_university;
+CREATE DATABASE test_university;
+USE DATABASE test_university;
+CREATE TABLE enrollment (
+  StudentID INTEGER,
+  CourseID INTEGER
+);
+INSERT INTO enrollment VALUES (1,101);
+INSERT INTO enrollment VALUES (1,103);
+INSERT INTO enrollment VALUES (2,102);
+INSERT INTO enrollment VALUES (3,103);
+INSERT INTO enrollment VALUES (4,104);
+INSERT INTO enrollment VALUES (5,105);
+CREATE TABLE course (
+  CourseID INTEGER,
+  CourseName TEXT,
+  Department TEXT
+);
+INSERT INTO course VALUES (101,'Introduction to Computer Science','Computer Science');
+INSERT INTO course VALUES (102,'Circuit Analysis','Electrical Engineering');
+INSERT INTO course VALUES (103,'Linear Algebra','Mathematics');
+INSERT INTO course VALUES (105,'Organic Chemistry','Chemistry');
 CREATE TABLE student (
   ID INTEGER,
   Name TEXT,
-  GPA FLOAT
+  GPA FLOAT,
+  Major TEXT
 );
-INSERT INTO student VALUES (1,'John',3.5);
-INSERT INTO student VALUES (2,'Jane',4.0);
-INSERT INTO student VALUES (3,'Jim',4.0);
-INSERT INTO student VALUES (4,'Jill',4.0);
+INSERT INTO student VALUES (1,'Alice Johnson',2.5,'Computer Science');
+INSERT INTO student VALUES (2,'Bob Smith',3.6,'Electrical Engineering');
+INSERT INTO student VALUES (3,'Catherine Lee',3.9,'Mathematics');
+INSERT INTO student VALUES (5,'Eva White',3.8,'Chemistry');
