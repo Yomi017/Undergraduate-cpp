@@ -1,102 +1,127 @@
 #include <iostream>
-#include <ceres/ceres.h>
-#include <cmath>
-#include <vector>
+#include <stack>
+#include <map>
+#include <sstream>
+#include <stdexcept>
+#include <cctype>
+#include <string>
 
-// 常数定义
-const double g = 9.8;  // 重力加速度，单位 m/s^2
-const double C_d = 0.47;  // 阻力系数（假设为球形物体）
-const double m = 1.0;  // 物体质量，单位 kg
-const double rho = 1.225;  // 空气密度，单位 kg/m^3
-const double A = 0.01;  // 物体横截面积，单位 m^2
+using namespace std;
 
-// 计算空气阻力
-double dragForce(double velocity) {
-    return 0.5 * C_d * rho * A * velocity * velocity;
-}
+bool evaluateBool(const string& expression, const map<string, string>& stringVariables, const map<string, double>& numericVariables) {
+    stack<double> values;
+    stack<char> operators;
 
-// 定义优化目标函数
-struct BallisticCostFunction {
-    BallisticCostFunction(double x_t, double y_t, double x_s, double y_s, double v0)
-        : x_t_(x_t), y_t_(y_t), x_s_(x_s), y_s_(y_s), v0_(v0) {}
-
-    template <typename T>
-    bool operator()(const T* const theta, T* residual) const {
-        // 角度theta (弧度)
-        T vx = v0_ * ceres::cos(theta[0]);  // 水平方向速度
-        T vy = v0_ * ceres::sin(theta[0]);  // 垂直方向速度
-
-        // 使用数值积分法模拟物体轨迹
-        T x = T(x_s_);
-        T y = T(y_s_);
-        T t = T(0);  // 时间
-        T dt = T(0.01);  // 时间步长
-
-        // 数值积分直到物体到达地面或最大时间
-        while (y > T(0) && t < T(100)) {
-            // 计算当前速度的大小
-            T velocity = ceres::sqrt(vx * vx + vy * vy);
-            T drag = dragForce(velocity);  // 空气阻力
-
-            // 计算加速度
-            T ax = -drag * vx / (m * velocity);  // 水平方向加速度
-            T ay = -g - drag * vy / (m * velocity);  // 垂直方向加速度
-
-            // 更新速度
-            vx += ax * dt;
-            vy += ay * dt;
-
-            // 更新位置
-            x += vx * dt;
-            y += vy * dt;
-
-            // 更新时间
-            t += dt;
+    // 解析数字、变量或字符串常量
+    auto resolveVariable = [&](const string& token) -> double {
+        if (isdigit(token[0]) || (token[0] == '-' && token.size() > 1)) {
+            return stod(token); // 数字直接转换
         }
+        if (token[0] == '\'' && token[token.size() - 1] == '\'') {
+            return token.size() > 2 ? 1.0 : 0.0; // 字符串非空为1，空为0
+        }
+        auto itNum = numericVariables.find(token);
+        if (itNum != numericVariables.end()) {
+            return itNum->second; // 从数字变量表中获取值
+        }
+        auto itStr = stringVariables.find(token);
+        if (itStr != stringVariables.end()) {
+            return !itStr->second.empty() ? 1.0 : 0.0; // 字符串非空为1，空为0
+        }
+        throw runtime_error("Undefined variable: " + token);
+    };
 
-        // 计算物体与目标位置的误差
-        residual[0] = ceres::sqrt((T(x_t_) - x) * (T(x_t_) - x) + (T(y_t_) - y) * (T(y_t_) - y));
-        return true;
+    // 运算符优先级
+    auto precedence = [](char op) -> int {
+        if (op == '&') return 1;  // && 对应 &
+        if (op == '|') return 0;  // || 对应 |
+        return 2;  // 数字运算符的优先级
+    };
+
+    // 执行数值运算
+    auto applyOp = [](double a, double b, char op) -> double {
+        if (op == '=') return a == b ? 1.0 : 0.0;  // 用==判断
+        if (op == '!') return a != b ? 1.0 : 0.0; // 用!=判断
+        if (op == '&') return a * b; // 逻辑与用乘法代替
+        if (op == '|') return a + b; // 逻辑或用加法代替
+        throw runtime_error("Unsupported operator");
+    };
+
+    // 预处理表达式：加空格
+    string expr = expression;
+    for (size_t i = 0; i < expr.length(); ++i) {
+        if (expr[i] == '&' && i + 1 < expr.length() && expr[i + 1] == '&') {
+            expr[i] = ' '; // 将&&转换为空格，后续处理为&
+            expr[i + 1] = '&';
+        } else if (expr[i] == '|' && i + 1 < expr.length() && expr[i + 1] == '|') {
+            expr[i] = ' '; // 将||转换为空格，后续处理为|
+            expr[i + 1] = '|';
+        } else if (ispunct(expr[i]) && !isspace(expr[i])) {
+            expr.insert(i, " "); // 其他符号添加空格
+            expr.insert(i + 2, " ");
+            i += 2;
+        }
     }
 
-private:
-    double x_t_, y_t_, x_s_, y_s_, v0_;
-};
+    stringstream ss(expr);
+    string token;
+
+    // 处理表达式
+    while (ss >> token) {
+        if (token == "(") {
+            operators.push('('); // 左括号
+        } else if (token == ")") {
+            // 计算括号内的表达式
+            while (!operators.empty() && operators.top() != '(') {
+                double b = values.top(); values.pop();
+                double a = values.top(); values.pop();
+                char op = operators.top(); operators.pop();
+                values.push(applyOp(a, b, op));
+            }
+            operators.pop(); // 弹出 '('
+        } else if (token == "&" || token == "|") {
+            // 处理逻辑运算符
+            while (!operators.empty() && precedence(operators.top()) >= precedence(token[0])) {
+                double b = values.top(); values.pop();
+                double a = values.top(); values.pop();
+                char op = operators.top(); operators.pop();
+                values.push(applyOp(a, b, op));
+            }
+            operators.push(token[0]);
+        } else if (token == "=" || token == "!") {
+            // 处理比较操作符
+            double rhs = values.top(); values.pop();
+            double lhs = resolveVariable(token); // 左侧是数值或变量
+            values.push(applyOp(lhs, rhs, token[0]));
+        } else {
+            // 解析数字或变量
+            values.push(resolveVariable(token));
+        }
+    }
+
+    // 计算剩余的运算符
+    while (!operators.empty()) {
+        double b = values.top(); values.pop();
+        double a = values.top(); values.pop();
+        char op = operators.top(); operators.pop();
+        values.push(applyOp(a, b, op));
+    }
+
+    return values.top() != 0; // 返回最终的布尔值（非零为true，零为false）
+}
 
 int main() {
-    // 输入参数
-    double v0 = 50.0;  // 初始速度，单位 m/s
-    double x_s = 0.0;  // 自己的初始位置，单位 m
-    double y_s = 0.0;
-    double x_t = 100.0;  // 目标位置，单位 m
-    double y_t = 0.0;
+    // 示例，字符串变量和数值变量
+    map<string, string> stringVariables = {{"Name", "sysy"}};
+    map<string, double> numericVariables = {{"ID", 6}, {"studentID", 3}};
 
-    // 设置 Ceres 求解器问题
-    ceres::Problem problem;
-
-    // 初始发射角度猜测 (单位: 弧度)
-    double initial_theta = 45.0 * M_PI / 180.0;  // 初始猜测为 45 度
-
-    // 创建成本函数并添加到问题中
-    problem.AddResidualBlock(
-        new ceres::AutoDiffCostFunction<BallisticCostFunction, 1, 1>(
-            new BallisticCostFunction(x_t, y_t, x_s, y_s, v0)),
-        nullptr,  // 不使用权重
-        &initial_theta);  // 要优化的参数
-
-    // 设置求解器选项
-    ceres::Solver::Options options;
-    options.minimizer_type = ceres::LINE_SEARCH;
-    options.max_num_iterations = 100;
-
-    // 求解问题
-    ceres::Solver::Summary summary;
-    ceres::Solve(options, &problem, &summary);
-
-    // 输出结果
-    std::cout << "最优发射角度: " << initial_theta * 180.0 / M_PI << " 度" << std::endl;
-    std::cout << "优化摘要：" << std::endl;
-    std::cout << summary.FullReport() << std::endl;
-
+    string expr = "Name = 'sysy' & (ID > 5 | studentID < 4)";
+    try {
+        bool result = evaluateBool(expr, stringVariables, numericVariables);
+        cout << "Result: " << result << endl; // 输出结果
+    } catch (const exception& e) {
+        cout << "Error: " << e.what() << endl;
+    }
+    system("pause");
     return 0;
 }

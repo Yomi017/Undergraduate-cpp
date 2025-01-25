@@ -869,7 +869,7 @@ void INNERJOIN(vector<TokenWithValue>::const_iterator& it, vector<TokenWithValue
 
 void identifier_select(const string& column_name, vector<TokenWithValue>::const_iterator& it, vector<TokenWithValue>::const_iterator end) {
     if (it != end && it->token == Token::POINT) {
-        INNERJOIN(it ,end);
+        // INNERJOIN(it ,end);
     }
     if (it != end && it->token == Token::COMMA) {
         ++it;
